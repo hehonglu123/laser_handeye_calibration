@@ -14,10 +14,11 @@ os.makedirs('captured_data', exist_ok=True)
 
 
 def main():
+
+	#####################################RR Fujicam#####################################
 	sub=RRN.SubscribeService('rr+tcp://localhost:12181/?service=fujicam')
 	obj = sub.GetDefaultClientWait(30)		#connect, timeout=30s
-	scan_change=sub.SubscribeWire("lineProfile")
-
+	scan_wire=sub.SubscribeWire("lineProfile")
 	sub.ClientConnectFailed += connect_failed
 
 	
@@ -35,68 +36,70 @@ def main():
 	#####################################Path Gen1 Translation#####################################
 	q2_default=np.zeros(6)
 	q2_default[0]=np.pi/2
-	R_default=np.array([[0, 1, -0.    ],
-            [ 1, 0,  0.    ],
-            [0.,      0.,     -1.    ]])
+	R_default=np.array([[-1, 0, -0.    ],
+						[0., 1,  0.    ],
+						[0., 0.,-1.    ]])
 	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
-	center_of_rotation=positioner.fwd(q_positioner_home,world=True).p
-	measure_distance=150
-	total_time=10
+	p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
+	measure_distance=150 #distance from tip with wire, as a guess only
+	total_time=5
 	num_points=int(total_time*streaming_rate)
-	q2_cmd_all1=[]
-	for angle in np.linspace(np.pi/5,3*np.pi/5,num_points):	#define rotation range
-		v_z_global=-Rx(angle)[:,1]
-		v_z=H2010_1440[:3,:3]@v_z_global ###pointing toward positioner's X with 15deg tiltd angle looking down
-		v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
-		v_x=np.cross(v_y,v_z)
-		p2_in_base_frame=center_of_rotation_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
-		R2=np.vstack((v_x,v_y,v_z)).T
-		q2_cmd_all1.append(robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0])
+
+	p_start=p_positioner_home+np.array([0,100,measure_distance])
+	p_end=p_positioner_home+np.array([0,-100,measure_distance])
+	p_all=np.linspace(p_start,p_end,num_points)
+	q1_cmd_all1=robot.find_curve_js(p_all,[R_default]*num_points,np.zeros(6))
+
+	
+
+	
 
 	#####################################Path Gen2 Circular Rotation#####################################
-	q2_cmd_all2=[]
-	for angle in np.linspace(np.pi/2,np.pi/4,num_points):	#define rotation range
-		v_z_global=-Ry(-angle)[:,0]
-		v_z=H2010_1440[:3,:3]@v_z_global ###pointing toward positioner's X with 15deg tiltd angle looking down
-		v_y=VectorPlaneProjection(np.array([-1,0,0]),v_z)	###FLIR's Y pointing toward 1440's -X in 1440's base frame, projected on v_z's plane
-		v_x=np.cross(v_y,v_z)
-		p2_in_base_frame=center_of_rotation_in_base_frame-measure_distance*v_z			###back project measure_distance-mm away from torch
-		R2=np.vstack((v_x,v_y,v_z)).T
-		q2_cmd_all2.append(robot2.inv(p2_in_base_frame,R2,last_joints=np.zeros(6))[0])
+	rotation_z_offset=-150
+	center_of_rotation=p_positioner_home+np.array([0,0,rotation_z_offset])
+	q1_cmd_all2=[]
+	for angle in np.linspace(np.pi/5,-np.pi/6,num_points):	#define rotation range
+		v_z=-Rx(angle)[:,-1]
+		v_x=np.array([-1,0,0])
+		v_y=np.cross(v_z,v_x)
+		p_in_base_frame=center_of_rotation-(measure_distance-rotation_z_offset)*v_z			###back project measure_distance-mm away from torch
+		R_in_base_frame=np.vstack((v_x,v_y,v_z)).T
+		q1_cmd_all2.append(robot.inv(p_in_base_frame,R_in_base_frame,last_joints=np.zeros(6))[0])
 
 
 	
 	##############################################MOTION#############################################################
+	scans = []
+	q1_exe=[]
 
-	
-
-	# Arrays to store object points and image points from all images
-	images = []
-	associated_q2=[]
-
-	SS.jog2q(np.hstack((q1_default,q2_cmd_all1[0],q_positioner_home)))
+	SS.jog2q(np.hstack((q1_cmd_all1[0],q2_default,q_positioner_home)))
 	now=time.perf_counter()
 	###CONTINUOUS CAPTURE for CALIBRATION
-	for i in range(len(q2_cmd_all1)):
-		SS.position_cmd(np.hstack((q1_default,q2_cmd_all1[i],q_positioner_home)),now)
+	for i in range(len(q1_cmd_all1)):
+		SS.position_cmd(np.hstack((q1_cmd_all1[i],q2_default,q_positioner_home)),now)
 		now=time.perf_counter()
-		if ir_img is not None and image_updated:
-			associated_q2.append(SS.q_cur[6:12])
-			image_updated = False	
-			images.append(ir_img)
+		q1_exe.append(SS.q_cur[0:6])
+		scan_data=np.vstack((scan_wire.InValue.I_data,scan_wire.InValue.Y_data,scan_wire.InValue.Z_data)).T
+		scans.append(scan_data.flatten())
 
-	SS.jog2q(np.hstack((q1_default,q2_cmd_all2[0],q_positioner_home)))
+	print("FIRST MOTION INDEX: ",len(q1_exe))
+
+	SS.jog2q(np.hstack((q1_cmd_all2[0],q2_default,q_positioner_home)))
 	now=time.perf_counter()
 	###CONTINUOUS CAPTURE for CALIBRATION
-	for i in range(len(q2_cmd_all2)):
-		SS.position_cmd(np.hstack((q1_default,q2_cmd_all2[i],q_positioner_home)),now)
+	for i in range(len(q1_cmd_all2)):
+		SS.position_cmd(np.hstack((q1_cmd_all2[i],q2_default,q_positioner_home)),now)
 		now=time.perf_counter()
-		if ir_img is not None and image_updated:
-			associated_q2.append(SS.q_cur[6:12])
-			image_updated = False
-			images.append(ir_img)
+		q1_exe.append(SS.q_cur[0:6])
+		scan_data=np.vstack((scan_wire.InValue.I_data,scan_wire.InValue.Y_data,scan_wire.InValue.Z_data)).T
+		scans.append(scan_data.flatten())
 			
 
+	### Save the captured data
+	recorded_dir = 'captured_data/SR_block/'
+	os.makedirs(recorded_dir, exist_ok=True)
+	np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
+	np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
 
 
 if __name__ == "__main__":
