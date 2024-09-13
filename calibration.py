@@ -3,31 +3,6 @@ import numpy as np
 from motoman_def import *
 import open3d as o3d
 
-def evaluate_hand_eye_calibration(R_cam2gripper, t_cam2gripper, R_gripper2base, t_gripper2base, rvecs, tvecs):
-	H_cam2gripper = H_from_RT(R_cam2gripper, t_cam2gripper)
-
-	R_target2base = []
-	rvec_target2base = []
-	t_target2base = []
-	for i in range(len(t_gripper2base)):
-		H_gripper2base=H_from_RT(R_gripper2base[i], t_gripper2base[i])
-		H_target2cam=H_from_RT(cv2.Rodrigues(rvecs[i])[0], tvecs[i])
-		H_target2base=H_gripper2base @ H_cam2gripper @ H_target2cam
-
-		R_target2base.append(H_target2base[:3,:3])
-		rvec_target2base.append(cv2.Rodrigues(H_target2base[:3,:3])[0])
-		t_target2base.append(H_target2base[:3,3])
-	
-	#3d scatter t_target2base
-	fig = plt.figure()
-	ax = fig.add_subplot(111, projection='3d')
-	ax.scatter(*zip(*t_target2base))
-	ax.set_xlabel('X')
-	ax.set_ylabel('Y')
-	ax.set_zlabel('Z')
-	set_axes_equal(ax)
-	plt.show()
-
 
 def main():
 	#####################################RR Robot#####################################

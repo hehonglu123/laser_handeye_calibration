@@ -54,17 +54,17 @@ def main():
 
 	
 
-	#####################################Path Gen2 Circular Rotation#####################################
-	rotation_z_offset=-150
-	center_of_rotation=p_positioner_home+np.array([0,0,rotation_z_offset])
-	q1_cmd_all2=[]
-	for angle in np.linspace(np.pi/5,-np.pi/6,num_points):	#define rotation range
-		v_z=-Rx(angle)[:,-1]
-		v_x=np.array([-1,0,0])
-		v_y=np.cross(v_z,v_x)
-		p_in_base_frame=center_of_rotation-(measure_distance-rotation_z_offset)*v_z			###back project measure_distance-mm away from torch
-		R_in_base_frame=np.vstack((v_x,v_y,v_z)).T
-		q1_cmd_all2.append(robot.inv(p_in_base_frame,R_in_base_frame,last_joints=np.zeros(6))[0])
+	# #####################################Path Gen2 Circular Rotation#####################################
+	# rotation_z_offset=-150
+	# center_of_rotation=p_positioner_home+np.array([0,0,rotation_z_offset])
+	# q1_cmd_all2=[]
+	# for angle in np.linspace(np.pi/5,-np.pi/6,num_points):	#define rotation range
+	# 	v_z=-Rx(angle)[:,-1]
+	# 	v_x=np.array([-1,0,0])
+	# 	v_y=np.cross(v_z,v_x)
+	# 	p_in_base_frame=center_of_rotation-(measure_distance-rotation_z_offset)*v_z			###back project measure_distance-mm away from torch
+	# 	R_in_base_frame=np.vstack((v_x,v_y,v_z)).T
+	# 	q1_cmd_all2.append(robot.inv(p_in_base_frame,R_in_base_frame,last_joints=np.zeros(6))[0])
 
 
 	
@@ -84,15 +84,15 @@ def main():
 
 	print("FIRST MOTION INDEX: ",len(q1_exe))
 
-	SS.jog2q(np.hstack((q1_cmd_all2[0],q2_default,q_positioner_home)))
-	now=time.perf_counter()
-	###CONTINUOUS CAPTURE for CALIBRATION
-	for i in range(len(q1_cmd_all2)):
-		SS.position_cmd(np.hstack((q1_cmd_all2[i],q2_default,q_positioner_home)),now)
-		now=time.perf_counter()
-		q1_exe.append(SS.q_cur[0:6])
-		scan_data=np.vstack((scan_wire.InValue.I_data,scan_wire.InValue.Y_data,scan_wire.InValue.Z_data)).T
-		scans.append(scan_data.flatten())
+	# SS.jog2q(np.hstack((q1_cmd_all2[0],q2_default,q_positioner_home)))
+	# now=time.perf_counter()
+	# ###CONTINUOUS CAPTURE for CALIBRATION
+	# for i in range(len(q1_cmd_all2)):
+	# 	SS.position_cmd(np.hstack((q1_cmd_all2[i],q2_default,q_positioner_home)),now)
+	# 	now=time.perf_counter()
+	# 	q1_exe.append(SS.q_cur[0:6])
+	# 	scan_data=np.vstack((scan_wire.InValue.I_data,scan_wire.InValue.Y_data,scan_wire.InValue.Z_data)).T
+	# 	scans.append(scan_data.flatten())
 			
 
 	### Save the captured data
