@@ -17,7 +17,7 @@ def main():
 
 	#####################################RR Fujicam#####################################
 	sub=RRN.SubscribeService('rr+tcp://localhost:12181/?service=fujicam')
-	obj = sub.GetDefaultClientWait(30)		#connect, timeout=30s
+	obj = sub.GetDefaultClientWait(2)		#connect, timeout=30s
 	scan_wire=sub.SubscribeWire("lineProfile")
 	sub.ClientConnectFailed += connect_failed
 
@@ -27,28 +27,55 @@ def main():
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
 	robot_no_tool=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
-	positioner=positioner_obj('D500B',def_path=config_dir+'D500B_robot_extended_config.yml',tool_file_path=config_dir+'positioner_tcp.csv',\
-		pulse2deg_file_path=config_dir+'D500B_pulse2deg_real.csv',base_transformation_file=config_dir+'D500B_pose_mocap.csv')
-	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 	streaming_rate=125.
+	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
 	SS=StreamingSend(RR_robot_sub,streaming_rate=streaming_rate)
 
-	#####################################Path Gen1 Translation#####################################
 	q2_default=np.zeros(6)
 	q2_default[0]=np.pi/2
-	R_default=np.array([[-1, 0, -0.    ],
-						[0., 1,  0.    ],
-						[0., 0.,-1.    ]])
 	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
-	p_positioner_home=positioner.fwd(q_positioner_home,world=True).p
-	measure_distance=150 #distance from tip with wire, as a guess only
-	total_time=5
-	num_points=int(total_time*streaming_rate)
 
-	p_start=p_positioner_home+np.array([0,100,measure_distance])
-	p_end=p_positioner_home+np.array([0,-100,measure_distance])
+	########################################TAUGHT POINT FROM TEACHPENDANT##################################
+	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING
+	signs=np.array([1,-1,1,-1,1,-1])
+	q1=np.radians([-19.9920,-17.9978,-19.3641,-33.3446,-20.8398,103.7901])*signs
+	q2=np.radians([-22.0563,-17.4322,-20.0974,-31.139,-19.8257,100.0584])*signs
+	q3=np.radians([-20.6861,-14.8484,-23.3194,-33.5871,-19.9471,103.59])*signs
+	
+	p1=robot.fwd(q1).p
+	p2=robot.fwd(q2).p
+	p3=robot.fwd(q3).p
+	#get the plane from 3 points
+	normal,centroid=fit_plane(np.vstack((p1,p2,p3)))
+	centroid=np.average(np.vstack((p1,p3)),axis=0)
+	centroid=np.average(np.vstack((centroid,p2)),axis=0)
+	length=np.average(np.array([np.linalg.norm(p1-p2),np.linalg.norm(p2-p3),np.linalg.norm(p3-p1)]))
+	#make sure normal is pointing down
+	if normal[2]>0:
+		normal=-normal
+	
+
+	
+	#####################################Path Gen1 Translation#####################################
+	moving_direction=p3-p1
+	moving_direction=moving_direction/np.linalg.norm(moving_direction)
+	R_torch=np.vstack((np.cross(-moving_direction,normal),-moving_direction,normal)).T
+	tilting_angle=np.radians(-45)
+	z_offset=20
+	R_torch=R_torch@Rx(tilting_angle)
+	p_start=centroid-1.5*length*moving_direction+z_offset*(-normal)
+	p_end=centroid+1.5*length*moving_direction+z_offset*(-normal)
+
+	print("p_start: ",p_start)
+	print("p_end: ",p_end)
+	print("R_torch: ",R_torch)
+
+	total_time=10
+	num_points=int(total_time*streaming_rate)
 	p_all=np.linspace(p_start,p_end,num_points)
-	q1_cmd_all1=robot.find_curve_js(p_all,[R_default]*num_points,np.zeros(6))
+	q1_cmd_all1=[]
+	for p in p_all:
+		q1_cmd_all1.append(robot.inv(p,R_torch,last_joints=np.zeros(6))[0])
 
 	
 
@@ -96,7 +123,7 @@ def main():
 			
 
 	### Save the captured data
-	recorded_dir = 'captured_data/SR_block/'
+	recorded_dir = 'captured_data/triangle/'
 	os.makedirs(recorded_dir, exist_ok=True)
 	np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
 	np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
