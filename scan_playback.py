@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-data_dir='captured_data/wall/'
+data_dir='captured_data/triangle/'
 q1_exe=np.loadtxt(data_dir+'q1_exe.csv',delimiter=',')
 scans=np.loadtxt(data_dir+'scans.csv',delimiter=',').reshape(len(q1_exe),-1,3)
 
