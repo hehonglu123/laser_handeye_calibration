@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from calibration import *
 
-data_dir='captured_data/triangle/'
+data_dir='captured_data/tetra/'
 q1_exe=np.loadtxt(data_dir+'q1_exe.csv',delimiter=',')
 scans=np.loadtxt(data_dir+'scans.csv',delimiter=',').reshape(len(q1_exe),-1,3)
 
 filtered_scans=[]
 ###FILTER OUT INTENSITIES FIRST
 for i in range(len(scans)):
-    filtered_scans.append(scans[i][scans[i][:, 0] > 50])
+    filtered_scans.append(scans[i][scans[i][:, 0] > 1])
     
 # Set up the plot
 fig, ax = plt.subplots()

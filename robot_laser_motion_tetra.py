@@ -38,10 +38,10 @@ def main():
 	########################################TAUGHT POINT FROM TEACHPENDANT##################################
 	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING
 	signs=np.array([1,-1,1,-1,1,-1])
-	q1=np.radians([])*signs
-	q2=np.radians([])*signs
-	q3=np.radians([])*signs
-	q4=np.radians([])*signs
+	q1=np.radians([3.9377,-25.9357,-17.1939,-11.0083,-72.8311,79.0141])*signs
+	q2=np.radians([-4.8084,-23.8468,-19.9235,2.4930,-73.7432,100.4366])*signs
+	q3=np.radians([13.8536,17.2602,-69.9760,-90.8255,-29.3152,-161.8720])*signs
+	q4=np.radians([-3.6276,-22.2679,-19.6159,3.0346,-75.5856,101.4262])*signs
 	
 	p1=robot.fwd(q1).p
 	p2=robot.fwd(q2).p
@@ -63,7 +63,7 @@ def main():
 	moving_direction=moving_direction/np.linalg.norm(moving_direction)
 	R_torch=np.vstack((np.cross(-moving_direction,normal),-moving_direction,normal)).T
 	tilting_angle=np.radians(-45)
-	z_offset=20
+	z_offset=45
 	R_torch=R_torch@Rx(tilting_angle)
 	p_start=centroid-1.5*length*moving_direction+z_offset*(-normal)
 	p_end=centroid+1.5*length*moving_direction+z_offset*(-normal)
@@ -99,7 +99,7 @@ def main():
 
 
 	### Save the captured data
-	recorded_dir = 'captured_data/triangle/'
+	recorded_dir = 'captured_data/tetra/'
 	os.makedirs(recorded_dir, exist_ok=True)
 	np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
 	np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
