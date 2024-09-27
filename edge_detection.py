@@ -10,7 +10,7 @@ scans=np.loadtxt(data_dir+'scans.csv',delimiter=',').reshape(len(q1_exe),-1,3)
 filtered_scans=[]
 ###FILTER OUT INTENSITIES FIRST
 for i in range(len(scans)):
-    filtered_scans.append(scans[i][scans[i][:, 0] > 1])
+    filtered_scans.append(scans[i][scans[i][:, 0] > 10])
     
 # Set up the plot
 fig, ax = plt.subplots()

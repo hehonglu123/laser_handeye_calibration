@@ -3,6 +3,35 @@ import numpy as np
 from motoman_def import *
 import open3d as o3d
 
+def rigid_transform_3D_planar(A, B):
+	assert len(A) == len(B), "Point sets A and B must have the same number of points"
+	assert A.shape[1] == B.shape[1], "Point sets A and B must have the same dimensionality"
+
+	# Step 1: Compute centroids
+	centroid_A = np.mean(A, axis=0)
+	centroid_B = np.mean(B, axis=0)
+
+	# Step 2: Center the points
+	AA = (A - centroid_A).T[1:]
+	BB = (B - centroid_B).T
+
+	R_partial=BB@np.linalg.pinv(AA)
+
+	R=np.eye(3)
+	R[:,0]=np.cross(R_partial[:,0],R_partial[:,1])
+	R[:,1]=R_partial[:,0]
+	R[:,2]=R_partial[:,1]
+	#normalize each axis
+	R[:,0]=R[:,0]/np.linalg.norm(R[:,0])
+	R[:,1]=R[:,1]/np.linalg.norm(R[:,1])
+	R[:,2]=R[:,2]/np.linalg.norm(R[:,2])
+
+
+	# Step 7: Compute translation vector t
+	t = centroid_B - R @ centroid_A
+
+	return R, t
+
 
 def edge_detection(points):
 	filter=np.array([-1,-1,-1,-1,-1,1,1,1,1,1])
@@ -34,6 +63,7 @@ def main():
 	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
 		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
 	robot_no_tool=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
+
 	data_dir='captured_data/triangle/'
 	q1_exe=np.loadtxt(data_dir+'q1_exe.csv',delimiter=',')
 	scans=np.loadtxt(data_dir+'scans.csv',delimiter=',').reshape(len(q1_exe),-1,3)
@@ -141,123 +171,52 @@ def main():
 
 	################################################3 CORNER ONLY########################################
 
-	# pose1=robot_no_tool.fwd(q1_exe[p1_cam_time_idx])
-	# pose2=robot_no_tool.fwd(q1_exe[p2_cam_time_idx])
-	# pose3=robot_no_tool.fwd(q1_exe[p3_cam_time_idx])
+	pose1=robot_no_tool.fwd(q1_exe[p1_cam_time_idx])
+	pose2=robot_no_tool.fwd(q1_exe[p2_cam_time_idx])
+	pose3=robot_no_tool.fwd(q1_exe[p3_cam_time_idx])
+
+	H1=H_from_RT(pose1.R,pose1.p)
+	H2=H_from_RT(pose2.R,pose2.p)
+	H3=H_from_RT(pose3.R,pose3.p)
 
 
-	# p1_eef=pose1.inv().R@p1_global+pose1.inv().p
-	# p2_eef=pose2.inv().R@p2_global+pose2.inv().p
-	# p3_eef=pose3.inv().R@p3_global+pose3.inv().p
+	p1_eef=(H_inv(H1)@np.array([p1_global[0],p1_global[1],p1_global[2],1]))[:3]
+	p2_eef=(H_inv(H2)@np.array([p2_global[0],p2_global[1],p2_global[2],1]))[:3]
+	p3_eef=(H_inv(H3)@np.array([p3_global[0],p3_global[1],p3_global[2],1]))[:3]
+
+	p1_eef[1]=-p1_eef[1]
+	p2_eef[1]=-p2_eef[1]
+	p3_eef[1]=-p3_eef[1]
 
 
-	# R,t=rigid_transform_3D(np.array([p1_cam,p2_cam,p3_cam]),np.array([p1_eef,p2_eef,p3_eef]))
-	# H=H_from_RT(R,t)
-	# # H=np.array([
-    # # [-0.28078767, -0.92708288, 0.24834577, -78.12],
-    # # [-0.70000236, 0.02078931, -0.71383787, 44.956],
-    # # [0.65662393, -0.37427949, -0.65479758, 555.028],
-    # # [0, 0, 0, 1]])
-	# print('H:',H)
-
-	# ###plot in 3d space
-	# H1=H_from_RT(pose1.R,pose1.p)
-	# H2=H_from_RT(pose2.R,pose2.p)
-	# H3=H_from_RT(pose3.R,pose3.p)
-	# p1_cam_global=H1@H@np.array([0,p1_cam[1],p1_cam[2],1])
-	# p2_cam_global=H2@H@np.array([0,p2_cam[1],p2_cam[2],1])
-	# p3_cam_global=H3@H@np.array([0,p3_cam[1],p3_cam[2],1])
-	# plt.figure()
-	# ax = plt.axes(projection='3d')
-	# ax.scatter(p1_global[0],p1_global[1],p1_global[2],c='r')
-	# ax.scatter(p2_global[0],p2_global[1],p2_global[2],c='r')
-	# ax.scatter(p3_global[0],p3_global[1],p3_global[2],c='r')
-	# ax.scatter(p1_cam_global[0],p1_cam_global[1],p1_cam_global[2],c='b')
-	# ax.scatter(p2_cam_global[0],p2_cam_global[1],p2_cam_global[2],c='b')
-	# ax.scatter(p3_cam_global[0],p3_cam_global[1],p3_cam_global[2],c='b')
-	# ax.set_xlabel('X Label')
-	# ax.set_ylabel('Y Label')
-	# ax.set_zlabel('Z Label')
-	# set_axes_equal(ax)
-	# plt.show()
-
-
-
-
-	################################################ALL TRIANGLE EDGES########################################
-	p1_p3_eef_all=[]
-	p1_p2_eef_all=[]
-	p2_p3_eef_all=[]
-	p1_p3_cam_all=[]
-	p1_p2_cam_all=[]
-	p2_p3_cam_all=[]
-	for i in range(p1_cam_time_idx,p3_cam_time_idx+1):
-		pose_cur=robot_no_tool.fwd(q1_exe[i])
-		H_cur_inv=H_inv(H_from_RT(pose_cur.R,pose_cur.p))
-
-		###p1-p3 right side edges always present
-		p1_p3_eef_all.append((H_cur_inv@np.array([p1_p3_global_all[i-p1_cam_time_idx][0],p1_p3_global_all[i-p1_cam_time_idx][1],p1_p3_global_all[i-p1_cam_time_idx][2],1]))[:3])
-		p1_p3_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][2]])
-
-		#if multiple edges detected
-		if len(edges_all[i-p1_cam_time_idx])>0:
-			if i<p2_cam_time_idx:
-				p1_p2_eef_all.append((H_cur_inv@np.array([p1_p2_global_all[i-p1_cam_time_idx][0],p1_p2_global_all[i-p1_cam_time_idx][1],p1_p2_global_all[i-p1_cam_time_idx][2],1]))[:3])
-				p1_p2_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2]])
-			else:
-				p2_p3_eef_all.append((H_cur_inv@np.array([p2_p3_global_all[i-p2_cam_time_idx][0],p2_p3_global_all[i-p2_cam_time_idx][1],p2_p3_global_all[i-p2_cam_time_idx][2],1]))[:3])
-				p2_p3_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2]])
-
-	p1_p3_eef_all=np.array(p1_p3_eef_all)
-	p1_p2_eef_all=np.array(p1_p2_eef_all)
-	p2_p3_eef_all=np.array(p2_p3_eef_all)
-	p1_p3_cam_all=np.array(p1_p3_cam_all)
-	p1_p2_cam_all=np.array(p1_p2_cam_all)
-	p2_p3_cam_all=np.array(p2_p3_cam_all)
-	p_eef_all=np.vstack((p1_p3_eef_all,p1_p2_eef_all,p2_p3_eef_all))
-	p_cam_all=np.vstack((p1_p3_cam_all,p1_p2_cam_all,p2_p3_cam_all))
-
-
-
-	R,t=rigid_transform_3D(p_cam_all,p_eef_all)
+	R,t=rigid_transform_3D(np.array([p1_cam,p2_cam,p3_cam]),np.array([p1_eef,p2_eef,p3_eef]))
 	H=H_from_RT(R,t)
-	print('H:',H)
-	#evaluate
-	p_cam_all_transformed=(R@p_cam_all.T+t.reshape(-1,1)).T
-	p1_p3_cam_all_transformed=(R@p1_p3_cam_all.T+t.reshape(-1,1)).T
-	p1_p2_cam_all_transformed=(R@p1_p2_cam_all.T+t.reshape(-1,1)).T
-	p2_p3_cam_all_transformed=(R@p2_p3_cam_all.T+t.reshape(-1,1)).T
-	print('mean error:',np.mean(np.linalg.norm(p_cam_all_transformed-p_eef_all,axis=1)))
-
-	####################################Compare with SERVOROBOT CALIBRAITON####################################
-
 	H_gt = np.array([[ -2.67052498e-01, -9.32632411e-01,  2.42651496e-01, -7.90839037e+01],
 					[-7.02253482e-01, 1.59028356e-02,  -7.11749357e-01, 5.05030933e+01],
 					[6.59941672e-01, -3.60477302e-01, -6.59191250e-01,  5.56486397e+02],
 					[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
-	
-	###evaluate
-	p_cam_all_transformed_gt=(H_gt[:3,:3]@p_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
-	print('mean error gt:',np.mean(np.linalg.norm(p_cam_all_transformed_gt-p_eef_all,axis=1)))
-	p1_p3_cam_all_transformed_gt=(H_gt[:3,:3]@p1_p3_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
-	p1_p2_cam_all_transformed_gt=(H_gt[:3,:3]@p1_p2_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
-	p2_p3_cam_all_transformed_gt=(H_gt[:3,:3]@p2_p3_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
+	print('H:',H)
 
-	#visualize in matplotlib
+	#visualize in matplotlib in EEF Frame
+	p1_cam_transformed=(H[:3,:3]@p1_cam.reshape(-1,1)+H[:3,3].reshape(-1,1))
+	p2_cam_transformed=(H[:3,:3]@p2_cam.reshape(-1,1)+H[:3,3].reshape(-1,1))
+	p3_cam_transformed=(H[:3,:3]@p3_cam.reshape(-1,1)+H[:3,3].reshape(-1,1))
+
+	p1_cam_transformed_gt=(H_gt[:3,:3]@p1_cam.reshape(-1,1)+H_gt[:3,3].reshape(-1,1))
+	p2_cam_transformed_gt=(H_gt[:3,:3]@p2_cam.reshape(-1,1)+H_gt[:3,3].reshape(-1,1))
+	p3_cam_transformed_gt=(H_gt[:3,:3]@p3_cam.reshape(-1,1)+H_gt[:3,3].reshape(-1,1))
 	fig = plt.figure()
 	ax = fig.add_subplot(111, projection='3d')
-	# ax.scatter(p_cam_all_transformed[:,0],p_cam_all_transformed[:,1],p_cam_all_transformed[:,2],c='r')
-	# ax.scatter(p_cam_all_transformed_gt[:,0],p_cam_all_transformed_gt[:,1],p_cam_all_transformed_gt[:,2],c='g')
-	# ax.scatter(p_eef_all[:,0],p_eef_all[:,1],p_eef_all[:,2],c='b')
-	ax.scatter(p1_p3_cam_all_transformed[:,0],p1_p3_cam_all_transformed[:,1],p1_p3_cam_all_transformed[:,2],c='r')
-	ax.scatter(p1_p2_cam_all_transformed[:,0],p1_p2_cam_all_transformed[:,1],p1_p2_cam_all_transformed[:,2],c='g')
-	ax.scatter(p2_p3_cam_all_transformed[:,0],p2_p3_cam_all_transformed[:,1],p2_p3_cam_all_transformed[:,2],c='b')
-	ax.scatter(p1_p3_eef_all[:,0],p1_p3_eef_all[:,1],p1_p3_eef_all[:,2],c='r')
-	ax.scatter(p1_p2_eef_all[:,0],p1_p2_eef_all[:,1],p1_p2_eef_all[:,2],c='g')
-	ax.scatter(p2_p3_eef_all[:,0],p2_p3_eef_all[:,1],p2_p3_eef_all[:,2],c='b')
-	ax.scatter(p1_p3_cam_all_transformed_gt[:,0],p1_p3_cam_all_transformed_gt[:,1],p1_p3_cam_all_transformed_gt[:,2],c='r')
-	ax.scatter(p1_p2_cam_all_transformed_gt[:,0],p1_p2_cam_all_transformed_gt[:,1],p1_p2_cam_all_transformed_gt[:,2],c='g')
-	ax.scatter(p2_p3_cam_all_transformed_gt[:,0],p2_p3_cam_all_transformed_gt[:,1],p2_p3_cam_all_transformed_gt[:,2],c='b')
+
+	ax.scatter(p1_cam_transformed[0],p1_cam_transformed[1],p1_cam_transformed[2],c='r')
+	ax.scatter(p2_cam_transformed[0],p2_cam_transformed[1],p2_cam_transformed[2],c='g')
+	ax.scatter(p3_cam_transformed[0],p3_cam_transformed[1],p3_cam_transformed[2],c='b')
+	ax.scatter(p1_eef[0],p1_eef[1],p1_eef[2],c='r')
+	ax.scatter(p2_eef[0],p2_eef[1],p2_eef[2],c='g')
+	ax.scatter(p3_eef[0],p3_eef[1],p3_eef[2],c='b')
+	ax.scatter(p1_cam_transformed_gt[0],p1_cam_transformed_gt[1],p1_cam_transformed_gt[2],c='r')
+	ax.scatter(p2_cam_transformed_gt[0],p2_cam_transformed_gt[1],p2_cam_transformed_gt[2],c='g')
+	ax.scatter(p3_cam_transformed_gt[0],p3_cam_transformed_gt[1],p3_cam_transformed_gt[2],c='b')
 	ax.set_xlabel('X Label')
 	ax.set_ylabel('Y Label')
 	ax.set_zlabel('Z Label')
@@ -265,41 +224,143 @@ def main():
 	set_axes_equal(ax)
 	plt.show()
 
-
-	####################################Compare in global frame####################################
-	p1_p3_global_all=[]
-	p1_p2_global_all=[]
-	p2_p3_global_all=[]
-	for i in range(p1_cam_time_idx,p3_cam_time_idx+1):
-		pose_cur=robot_no_tool.fwd(q1_exe[i])
-		H_cur=H_from_RT(pose_cur.R,pose_cur.p)
-		
-		###p1-p3 right side edges always present
-		p1_p3_global_all.append((H_cur@H_gt@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][2],1]))[:3])
-		###p1-p2
-		if len(edges_all[i-p1_cam_time_idx])>0:
-			if i<p2_cam_time_idx:
-				p1_p2_global_all.append((H_cur@H_gt@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2],1]))[:3])
-			else:
-				p2_p3_global_all.append((H_cur@H_gt@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2],1]))[:3])
-
-	p1_p3_global_all=np.array(p1_p3_global_all)
-	p1_p2_global_all=np.array(p1_p2_global_all)
-	p2_p3_global_all=np.array(p2_p3_global_all)
-
-	fig = plt.figure()
-	ax = fig.add_subplot(111, projection='3d')
-	ax.scatter(p1_p3_global_all[:,0],p1_p3_global_all[:,1],p1_p3_global_all[:,2],c='r')
-	ax.scatter(p1_p2_global_all[:,0],p1_p2_global_all[:,1],p1_p2_global_all[:,2],c='g')
-	ax.scatter(p2_p3_global_all[:,0],p2_p3_global_all[:,1],p2_p3_global_all[:,2],c='b')
+	###plot in 3d space
+	p1_cam_global=H1@H@np.array([0,p1_cam[1],p1_cam[2],1])
+	p2_cam_global=H2@H@np.array([0,p2_cam[1],p2_cam[2],1])
+	p3_cam_global=H3@H@np.array([0,p3_cam[1],p3_cam[2],1])
+	plt.figure()
+	ax = plt.axes(projection='3d')
 	ax.scatter(p1_global[0],p1_global[1],p1_global[2],c='r')
-	ax.scatter(p2_global[0],p2_global[1],p2_global[2],c='g')
-	ax.scatter(p3_global[0],p3_global[1],p3_global[2],c='b')
+	ax.scatter(p2_global[0],p2_global[1],p2_global[2],c='r')
+	ax.scatter(p3_global[0],p3_global[1],p3_global[2],c='r')
+	ax.scatter(p1_cam_global[0],p1_cam_global[1],p1_cam_global[2],c='b')
+	ax.scatter(p2_cam_global[0],p2_cam_global[1],p2_cam_global[2],c='b')
+	ax.scatter(p3_cam_global[0],p3_cam_global[1],p3_cam_global[2],c='b')
 	ax.set_xlabel('X Label')
 	ax.set_ylabel('Y Label')
 	ax.set_zlabel('Z Label')
 	set_axes_equal(ax)
 	plt.show()
+
+
+
+
+	################################################ALL TRIANGLE EDGES########################################
+	# p1_p3_eef_all=[]
+	# p1_p2_eef_all=[]
+	# p2_p3_eef_all=[]
+	# p1_p3_cam_all=[]
+	# p1_p2_cam_all=[]
+	# p2_p3_cam_all=[]
+	# for i in range(p1_cam_time_idx,p3_cam_time_idx+1):
+	# 	pose_cur=robot_no_tool.fwd(q1_exe[i])
+	# 	H_cur_inv=H_inv(H_from_RT(pose_cur.R,pose_cur.p))
+
+	# 	###p1-p3 right side edges always present
+	# 	p1_p3_eef_all.append((H_cur_inv@np.array([p1_p3_global_all[i-p1_cam_time_idx][0],p1_p3_global_all[i-p1_cam_time_idx][1],p1_p3_global_all[i-p1_cam_time_idx][2],1]))[:3])
+	# 	p1_p3_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][2]])
+
+	# 	#if multiple edges detected
+	# 	if len(edges_all[i-p1_cam_time_idx])>0:
+	# 		if i<p2_cam_time_idx:
+	# 			p1_p2_eef_all.append((H_cur_inv@np.array([p1_p2_global_all[i-p1_cam_time_idx][0],p1_p2_global_all[i-p1_cam_time_idx][1],p1_p2_global_all[i-p1_cam_time_idx][2],1]))[:3])
+	# 			p1_p2_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2]])
+	# 		else:
+	# 			p2_p3_eef_all.append((H_cur_inv@np.array([p2_p3_global_all[i-p2_cam_time_idx][0],p2_p3_global_all[i-p2_cam_time_idx][1],p2_p3_global_all[i-p2_cam_time_idx][2],1]))[:3])
+	# 			p2_p3_cam_all.append([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2]])
+
+	# p1_p3_eef_all=np.array(p1_p3_eef_all)
+	# p1_p2_eef_all=np.array(p1_p2_eef_all)
+	# p2_p3_eef_all=np.array(p2_p3_eef_all)
+	# p1_p3_cam_all=np.array(p1_p3_cam_all)
+	# p1_p2_cam_all=np.array(p1_p2_cam_all)
+	# p2_p3_cam_all=np.array(p2_p3_cam_all)
+	# p_eef_all=np.vstack((p1_p3_eef_all,p1_p2_eef_all,p2_p3_eef_all))
+	# p_cam_all=np.vstack((p1_p3_cam_all,p1_p2_cam_all,p2_p3_cam_all))
+
+
+
+	# R,t=rigid_transform_3D_planar(p_cam_all,p_eef_all)
+	# H=H_from_RT(R,t)
+	# print('H:',H)
+	# #evaluate
+	# p_cam_all_transformed=(R@p_cam_all.T+t.reshape(-1,1)).T
+	# p1_p3_cam_all_transformed=(R@p1_p3_cam_all.T+t.reshape(-1,1)).T
+	# p1_p2_cam_all_transformed=(R@p1_p2_cam_all.T+t.reshape(-1,1)).T
+	# p2_p3_cam_all_transformed=(R@p2_p3_cam_all.T+t.reshape(-1,1)).T
+	# print('mean error:',np.mean(np.linalg.norm(p_cam_all_transformed-p_eef_all,axis=1)))
+
+	# ####################################Compare with SERVOROBOT CALIBRAITON####################################
+
+	# H_gt = np.array([[ -2.67052498e-01, -9.32632411e-01,  2.42651496e-01, -7.90839037e+01],
+	# 				[-7.02253482e-01, 1.59028356e-02,  -7.11749357e-01, 5.05030933e+01],
+	# 				[6.59941672e-01, -3.60477302e-01, -6.59191250e-01,  5.56486397e+02],
+	# 				[ 0.00000000e+00,  0.00000000e+00,  0.00000000e+00,  1.00000000e+00]])
+	
+	# ###evaluate
+	# p_cam_all_transformed_gt=(H_gt[:3,:3]@p_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
+	# print('mean error gt:',np.mean(np.linalg.norm(p_cam_all_transformed_gt-p_eef_all,axis=1)))
+	# p1_p3_cam_all_transformed_gt=(H_gt[:3,:3]@p1_p3_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
+	# p1_p2_cam_all_transformed_gt=(H_gt[:3,:3]@p1_p2_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
+	# p2_p3_cam_all_transformed_gt=(H_gt[:3,:3]@p2_p3_cam_all.T+H_gt[:3,3].reshape(-1,1)).T
+
+	# #visualize in matplotlib
+	# fig = plt.figure()
+	# ax = fig.add_subplot(111, projection='3d')
+	# # ax.scatter(p_cam_all_transformed[:,0],p_cam_all_transformed[:,1],p_cam_all_transformed[:,2],c='r')
+	# # ax.scatter(p_cam_all_transformed_gt[:,0],p_cam_all_transformed_gt[:,1],p_cam_all_transformed_gt[:,2],c='g')
+	# # ax.scatter(p_eef_all[:,0],p_eef_all[:,1],p_eef_all[:,2],c='b')
+	# ax.scatter(p1_p3_cam_all_transformed[:,0],p1_p3_cam_all_transformed[:,1],p1_p3_cam_all_transformed[:,2],c='r')
+	# ax.scatter(p1_p2_cam_all_transformed[:,0],p1_p2_cam_all_transformed[:,1],p1_p2_cam_all_transformed[:,2],c='g')
+	# ax.scatter(p2_p3_cam_all_transformed[:,0],p2_p3_cam_all_transformed[:,1],p2_p3_cam_all_transformed[:,2],c='b')
+	# ax.scatter(p1_p3_eef_all[:,0],p1_p3_eef_all[:,1],p1_p3_eef_all[:,2],c='r')
+	# ax.scatter(p1_p2_eef_all[:,0],p1_p2_eef_all[:,1],p1_p2_eef_all[:,2],c='g')
+	# ax.scatter(p2_p3_eef_all[:,0],p2_p3_eef_all[:,1],p2_p3_eef_all[:,2],c='b')
+	# ax.scatter(p1_p3_cam_all_transformed_gt[:,0],p1_p3_cam_all_transformed_gt[:,1],p1_p3_cam_all_transformed_gt[:,2],c='r')
+	# ax.scatter(p1_p2_cam_all_transformed_gt[:,0],p1_p2_cam_all_transformed_gt[:,1],p1_p2_cam_all_transformed_gt[:,2],c='g')
+	# ax.scatter(p2_p3_cam_all_transformed_gt[:,0],p2_p3_cam_all_transformed_gt[:,1],p2_p3_cam_all_transformed_gt[:,2],c='b')
+	# ax.set_xlabel('X Label')
+	# ax.set_ylabel('Y Label')
+	# ax.set_zlabel('Z Label')
+	# # ax.legend(['Transformed','Transformed_SR','EEF'])
+	# set_axes_equal(ax)
+	# plt.show()
+
+
+	# ####################################Compare in global frame####################################
+	# p1_p3_global_all=[]
+	# p1_p2_global_all=[]
+	# p2_p3_global_all=[]
+	# for i in range(p1_cam_time_idx,p3_cam_time_idx+1):
+	# 	pose_cur=robot_no_tool.fwd(q1_exe[i])
+	# 	H_cur=H_from_RT(pose_cur.R,pose_cur.p)
+		
+	# 	###p1-p3 right side edges always present
+	# 	p1_p3_global_all.append((H_cur@H@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][-1]][2],1]))[:3])
+	# 	###p1-p2
+	# 	if len(edges_all[i-p1_cam_time_idx])>0:
+	# 		if i<p2_cam_time_idx:
+	# 			p1_p2_global_all.append((H_cur@H@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2],1]))[:3])
+	# 		else:
+	# 			p2_p3_global_all.append((H_cur@H@np.array([0,filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][1],filtered_scans[i][edges_all[i-p1_cam_time_idx][0]][2],1]))[:3])
+
+	# p1_p3_global_all=np.array(p1_p3_global_all)
+	# p1_p2_global_all=np.array(p1_p2_global_all)
+	# p2_p3_global_all=np.array(p2_p3_global_all)
+
+	# fig = plt.figure()
+	# ax = fig.add_subplot(111, projection='3d')
+	# ax.scatter(p1_p3_global_all[:,0],p1_p3_global_all[:,1],p1_p3_global_all[:,2],c='r')
+	# ax.scatter(p1_p2_global_all[:,0],p1_p2_global_all[:,1],p1_p2_global_all[:,2],c='g')
+	# ax.scatter(p2_p3_global_all[:,0],p2_p3_global_all[:,1],p2_p3_global_all[:,2],c='b')
+	# ax.scatter(p1_global[0],p1_global[1],p1_global[2],c='r')
+	# ax.scatter(p2_global[0],p2_global[1],p2_global[2],c='g')
+	# ax.scatter(p3_global[0],p3_global[1],p3_global[2],c='b')
+	# ax.set_xlabel('X Label')
+	# ax.set_ylabel('Y Label')
+	# ax.set_zlabel('Z Label')
+	# set_axes_equal(ax)
+	# plt.show()
 
 if __name__ == '__main__':
 	main()
