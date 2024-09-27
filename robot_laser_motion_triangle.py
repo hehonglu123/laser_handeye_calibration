@@ -33,14 +33,14 @@ def main():
 
 	q2_default=np.zeros(6)
 	q2_default[0]=np.pi/2
-	q_positioner_home=np.array([-15.*np.pi/180.,np.pi/2])
+	q_positioner_home=np.array([-15.*np.pi/180.,np.pi])
 
 	########################################TAUGHT POINT FROM TEACHPENDANT##################################
-	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING
-	signs=np.array([1,-1,1,-1,1,-1])
-	q1=np.radians([-19.9920,-17.9978,-19.3641,-33.3446,-20.8398,103.7901])*signs
-	q2=np.radians([-22.0563,-17.4322,-20.0974,-31.139,-19.8257,100.0584])*signs
-	q3=np.radians([-20.6861,-14.8484,-23.3194,-33.5871,-19.9471,103.59])*signs
+	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING THROUGH save_q.py
+
+	q1 = np.array([-0.47997916,  0.47394517, -0.06122775, -0.27545108, -0.71117267,  0.6653875])
+	q2 = np.array([-0.51271596,  0.47143835, -0.06415327, -0.29002304, -0.71870424,  0.70679911])
+	q3 = np.array([-0.4953717,   0.41889569, -0.13339059, -0.2882826,  -0.69849541,  0.69232999])
 	
 	p1=robot.fwd(q1).p
 	p2=robot.fwd(q2).p
@@ -63,8 +63,8 @@ def main():
 	tilting_angle=np.radians(-45)
 	z_offset=20
 	R_torch=R_torch@Rx(tilting_angle)
-	p_start=centroid-1.5*length*moving_direction+z_offset*(-normal)
-	p_end=centroid+1.5*length*moving_direction+z_offset*(-normal)
+	p_start=centroid-1.5*length*moving_direction+(z_offset+30)*(-normal)
+	p_end=centroid+1.5*length*moving_direction+(z_offset-10)*(-normal)
 
 	print("p_start: ",p_start)
 	print("p_end: ",p_end)
@@ -73,9 +73,10 @@ def main():
 	total_time=10
 	num_points=int(total_time*streaming_rate)
 	p_all=np.linspace(p_start,p_end,num_points)
-	q1_cmd_all1=[]
-	for p in p_all:
-		q1_cmd_all1.append(robot.inv(p,R_torch,last_joints=np.zeros(6))[0])
+	q1_cmd_all1=robot.find_curve_js(p_all,[R_torch]*len(p_all),q_seed=np.zeros(6))
+	# q1_cmd_all1=[]
+	# for p in p_all:
+	# 	q1_cmd_all1.append(robot.inv(p,R_torch,last_joints=np.zeros(6))[0])
 
 
 	
@@ -96,11 +97,11 @@ def main():
 	print("FIRST MOTION INDEX: ",len(q1_exe))
 
 
-	### Save the captured data
-	recorded_dir = 'captured_data/triangle/'
-	os.makedirs(recorded_dir, exist_ok=True)
-	np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
-	np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
+	# ### Save the captured data
+	# recorded_dir = 'captured_data/triangle/'
+	# os.makedirs(recorded_dir, exist_ok=True)
+	# np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
+	# np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
 
 
 if __name__ == "__main__":

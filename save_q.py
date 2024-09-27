@@ -13,11 +13,13 @@ def main():
 	while True:
 		try:
 			input('Press Enter to store q')
+			print(SS.q_cur[:6])
 			q_all.append(SS.q_cur[:6])
 		except KeyboardInterrupt:
 			break
 	
-	print(q_all)
+	print()
+	print(np.array(q_all))
 
 if __name__ == '__main__':
 	main()
