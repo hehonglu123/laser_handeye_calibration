@@ -1,4 +1,4 @@
-# 2D Laser Camera Handeye Calibration using a triangle target.
+# 2D Laser Camera Handeye Calibration using a Triangle Target.
 
 ## Underline Algo
 <img src="images/calibration_algo.png" alt="Alt Text" width="600"  height="auto">
@@ -18,5 +18,10 @@ Start RR robot driver. Jog to triangle vertices in Teach mode and use `save_q.py
 ### Processing
 Stack up all frames in time axis. Use `scan_playback.py`, `pc_playback.py` and `edge_detection.py` to check each step's result.
 The scripts will identify triangle vertices in time and space, and display as 2D+time 3D pointcloud.
+
+<img src="images/2d+time.png" alt="Alt Text" width="800"  height="auto">
+
+<img src="images/edge_detection.png" alt="Alt Text" width="300"  height="auto">
+
 
 Run `calibration.py` to generate the transformation matrix. 
