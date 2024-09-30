@@ -25,3 +25,7 @@ The scripts will identify triangle vertices in time and space, and display as 2D
 
 
 Run `calibration.py` to generate the transformation matrix. 
+
+
+### Visual Verification
+Use `save_q.py` to log a tapped spatial point. Run `verification.py` to see if the laser line is able to reach that point.

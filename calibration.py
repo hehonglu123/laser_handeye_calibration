@@ -283,6 +283,7 @@ def main():
 	R,t=rigid_transform_3D_planar(p_cam_all,p_eef_all)
 	H=H_from_RT(R,t)
 	print('H:',H)
+	np.savetxt('fujicam.csv',H,delimiter=',')
 	#evaluate
 	p_cam_all_transformed=(R@p_cam_all.T+t.reshape(-1,1)).T
 	p1_p3_cam_all_transformed=(R@p1_p3_cam_all.T+t.reshape(-1,1)).T
