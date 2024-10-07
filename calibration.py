@@ -363,5 +363,27 @@ def main():
 	set_axes_equal(ax)
 	plt.show()
 
+	####################################Register Scans into Pointcloud####################################
+	fig = plt.figure()
+	ax = fig.add_subplot(111, projection='3d')
+	for i in range(p1_cam_time_idx,p3_cam_time_idx+1):
+		pose_cur=robot_no_tool.fwd(q1_exe[i])
+		H_cur=H_from_RT(pose_cur.R,pose_cur.p)
+
+		# scan_global_frame=(H_cur@H@np.array([0,filtered_scans[i][:,1],filtered_scans[i][:,2],1]))[:3]
+		start_idx=edges_all[i-p1_cam_time_idx][0]
+		end_idx=max(edges_all[i-p1_cam_time_idx][-1],start_idx+1)
+		points_scan_frame=np.vstack((np.zeros(end_idx-start_idx),filtered_scans[i][start_idx:end_idx,1],filtered_scans[i][start_idx:end_idx,2])).T
+		scan_global_frame=(H_cur@H)[:,:3]@points_scan_frame.T+(H_cur@H)[:,3].reshape(-1,1)
+		ax.scatter(scan_global_frame[0],scan_global_frame[1],scan_global_frame[2],c='b')
+	
+	plt.show()
+	
+	
+
+
+	
+
+
 if __name__ == '__main__':
 	main()
