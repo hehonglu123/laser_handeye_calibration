@@ -33,11 +33,11 @@ def rigid_transform_3D_planar(A, B):
 	return R, t
 
 
-def edge_detection(points):
+def edge_detection(points,z_threshold=50):
 	filter=np.array([-1,-1,-1,-1,-1,1,1,1,1,1])
 	conv=np.vstack((np.convolve(points[:,0],filter,mode='same'),np.convolve(points[:,1],filter,mode='same'))).T
 	conv=np.linalg.norm(conv,axis=1)
-	edge_indices = np.where(conv > 30)[0]
+	edge_indices = np.where((conv > 30) & (points[:, 1] > z_threshold))[0]
 	
 	#for continuous edge_indices, filter the one with largest z
 	last_valid_edge = 0
@@ -60,8 +60,8 @@ def edge_detection(points):
 def main():
 	#####################################RR Robot#####################################
 	config_dir='../../Welding_Motoman/config/'
-	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
-		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
+	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch_15_fujimount_calib.csv',\
+		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 	robot_no_tool=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 
 	data_dir='captured_data/triangle/'
@@ -71,7 +71,7 @@ def main():
 	filtered_scans=[]
 	###FILTER OUT INTENSITIES FIRST
 	for i in range(len(scans)):
-		filtered_scans.append(scans[i][scans[i][:, 0] > 50])
+		filtered_scans.append(scans[i][scans[i][:, 0] > 40])
 
 	edges_all=[]
 	scan_idx_w_edges=[]
@@ -158,9 +158,9 @@ def main():
 	#############################################################################CALIBRATION######################################################
 	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING
 
-	p1_global=robot.fwd(np.array([-0.47997916,  0.47394517, -0.06122775, -0.27545108, -0.71117267,  0.6653875])).p
-	p2_global=robot.fwd(np.array([-0.51271596,  0.47143835, -0.06415327, -0.29002304, -0.71870424,  0.70679911])).p
-	p3_global=robot.fwd(np.array([-0.4953717,   0.41889569, -0.13339059, -0.2882826,  -0.69849541,  0.69232999])).p
+	p1_global=robot.fwd(np.array([-0.37802149,  0.52422802,  0.0179147,   0.15452425, -0.81583125,  0.17700681])).p
+	p2_global=robot.fwd(np.array([-0.57462441,  0.71487469,  0.26614567, -0.42366195, -1.17533471,  0.58862825])).p
+	p3_global=robot.fwd(np.array([-0.41618405,  0.44662628, -0.08421555,  0.00346383, -0.77468358,  0.66826597])).p
 
 	print('p1_global:',p1_global)
 	print('p2_global:',p2_global)

@@ -24,8 +24,8 @@ def main():
 	
 	#####################################RR Robot#####################################
 	config_dir='../../Welding_Motoman/config/'
-	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch.csv',\
-		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv',d=15)
+	robot=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',tool_file_path=config_dir+'torch_15_fujimount_calib.csv',\
+		pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 	robot_no_tool=robot_obj('MA2010_A0',def_path=config_dir+'MA2010_A0_robot_default_config.yml',pulse2deg_file_path=config_dir+'MA2010_A0_pulse2deg_real.csv')
 	streaming_rate=125.
 	RR_robot_sub = RRN.SubscribeService('rr+tcp://localhost:59945?service=robot')
@@ -33,14 +33,14 @@ def main():
 
 	q2_default=np.zeros(6)
 	q2_default[0]=np.pi/2
-	q_positioner_home=np.array([-15.*np.pi/180.,np.pi])
+	q_positioner_home=np.array([-15.*np.pi/180.,0])
 
 	########################################TAUGHT POINT FROM TEACHPENDANT##################################
 	###USE TEACHPENDANT TO JOG TO 3 CORNERS, RECORD THE ABSOLUTE JOINT ANGLES READING THROUGH save_q.py
 
-	q1 = np.array([-0.47997916,  0.47394517, -0.06122775, -0.27545108, -0.71117267,  0.6653875])
-	q2 = np.array([-0.51271596,  0.47143835, -0.06415327, -0.29002304, -0.71870424,  0.70679911])
-	q3 = np.array([-0.4953717,   0.41889569, -0.13339059, -0.2882826,  -0.69849541,  0.69232999])
+	q1 = np.array([-0.37802149,  0.52422802,  0.0179147,   0.15452425, -0.81583125,  0.17700681])
+	q2 = np.array([-0.57462441,  0.71487469,  0.26614567, -0.42366195, -1.17533471,  0.58862825])
+	q3 = np.array([-0.41618405,  0.44662628, -0.08421555,  0.00346383, -0.77468358,  0.66826597])
 	
 	p1=robot.fwd(q1).p
 	p2=robot.fwd(q2).p
@@ -63,8 +63,8 @@ def main():
 	tilting_angle=np.radians(-45)
 	z_offset=20
 	R_torch=R_torch@Rx(tilting_angle)
-	p_start=centroid-1.5*length*moving_direction+(z_offset+30)*(-normal)
-	p_end=centroid+1.5*length*moving_direction+(z_offset-10)*(-normal)
+	p_start=centroid-1.5*length*moving_direction+(z_offset+35)*(-normal)
+	p_end=centroid+1.5*length*moving_direction+(z_offset-15)*(-normal)
 
 	print("p_start: ",p_start)
 	print("p_end: ",p_end)
@@ -97,11 +97,11 @@ def main():
 	print("FIRST MOTION INDEX: ",len(q1_exe))
 
 
-	# ### Save the captured data
-	# recorded_dir = 'captured_data/triangle/'
-	# os.makedirs(recorded_dir, exist_ok=True)
-	# np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
-	# np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
+	### Save the captured data
+	recorded_dir = 'captured_data/triangle/'
+	os.makedirs(recorded_dir, exist_ok=True)
+	np.savetxt(recorded_dir+'scans.csv', np.array(scans), delimiter=',')
+	np.savetxt(recorded_dir+'q1_exe.csv', np.array(q1_exe), delimiter=',')
 
 
 if __name__ == "__main__":
